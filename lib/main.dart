@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:trueque/screens/password_screen.dart';
+import 'package:trueque/screens/profile_screen.dart';
 import 'package:trueque/screens/register_screen.dart';
 import 'package:trueque/theme/app_theme.dart';
 import 'package:trueque/screens/login_screen.dart';
 import 'package:trueque/screens/new_password_screen.dart'; 
-import 'package:trueque/screens/home_screen.dart';
+//import 'package:trueque/screens/home_screen.dart';
 
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,12 +22,24 @@ Future<void> main() async {
   
   _validateRequiredEnvVars();
 
-  
   await Supabase.initialize(
     url: supabaseUrl!,
     anonKey: supabaseAnonKey!,
-    
   );
+
+  // Escuchar eventos de autenticación
+  Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    final event = data.event;
+    
+    // Detectar cuando es un evento de recuperación de contraseña
+    if (event == AuthChangeEvent.passwordRecovery) {
+     
+      navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        '/reset-password',
+        (route) => false,
+      );
+    }
+  });
 
   runApp(const MyApp());
 }
@@ -44,6 +59,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey, 
       debugShowCheckedModeBanner: false,
       title: 'Trueque',
       theme: AppTheme.getTheme(),
@@ -53,11 +69,11 @@ class MyApp extends StatelessWidget {
         '/': (context) => const LoginScreen(), 
         '/login': (context) => const LoginScreen(),
         '/registro': (context) => const RegisterScreen(),
-        '/home': (context) => const HomeScreen(),
+       // '/home': (context) => const HomeScreen(),
         '/reset-password': (context) => const NewPasswordScreen(),
         '/password': (context) => const PasswordScreen(),
+        '/profile': (context) => const ProfileScreen(),
       }
-
     );
   }
 }

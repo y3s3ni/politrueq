@@ -32,7 +32,7 @@
                  <!-- Accepts URIs that begin with YOUR_SCHEME://YOUR_HOST -->
                  <data
                   android:scheme="io.supabase.poli-trueque"
-                  android:host="login-callback" />
+                  android:host="login" />
                   <data
                    android:scheme="io.supabase.poli-trueque"
                     android:host="reset-password" />

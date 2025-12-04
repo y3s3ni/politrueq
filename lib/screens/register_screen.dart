@@ -34,7 +34,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   /// Función para verificar si el correo ya existe en la base de datos
-  /// Llama a la función RPC 'check_email_exists' que creamos en Supabase.
   Future<bool> _checkIfEmailExists(String email) async {
     try {
       if (kDebugMode) {
@@ -76,7 +75,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final emailExists = await _checkIfEmailExists(email);
       if (emailExists) {
         _mostrarError(
-          'Este correo ya está registrado.\n\n',
+          'Este correo ya está registrado.\n',
         );
         return; 
       }
@@ -93,7 +92,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
      
       if (response.user != null) {
         if (kDebugMode) {
-          print(' Revise su correo - Email de confirmación enviado');
+          print('✅ Revise su correo - Email de confirmación enviado');
         }
         _mostrarExito();
       } else {
@@ -104,7 +103,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     } on AuthException catch (e) {
       if (kDebugMode) {
-        print(' AuthException: ${e.message} (Status: ${e.statusCode})');
+        print('❌ AuthException: ${e.message} (Status: ${e.statusCode})');
       }
 
       String errorMessage;
@@ -113,10 +112,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           e.message.toLowerCase().contains('duplicate') ||
           e.message.toLowerCase().contains('unique constraint')) {
         errorMessage = 
-            'Este correo ya está registrado.\n\n';
+            'Este correo ya está registrado.';
       } else if (e.message.toLowerCase().contains('email not confirmed')) {
         errorMessage = 
-            'Este correo ya está registrado pero no confirmado.\n\n'
+            'Este correo ya está registrado pero no confirmado.'
             'Por favor revise su bandeja de entrada y spam para '
             'encontrar el correo de confirmación.';
       } else if (e.message.toLowerCase().contains('invalid email')) {
@@ -131,11 +130,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     } on Exception catch (e) {
       if (kDebugMode) {
-        print(' Error inesperado en _register: $e');
+        print('❌ Error inesperado en _register: $e');
       }
       
       _mostrarError(
-        'Ocurrió un error inesperado.\n\n'
+        'Ocurrió un error inesperado.\n'
         'Verifique su conexión a internet e intente nuevamente.',
       );
     }
@@ -160,7 +159,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Entendido', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Entendido',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primaryColor,
+              ),
+            ),
           ),
         ],
       ),
@@ -178,46 +183,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-                     const SizedBox(height: 20),
+            const SizedBox(height: 20),
             Text(
               '¡Revise su correo!',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppTheme.primaryColor,
-                fontSize: 24,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Text(
               'Hemos enviado un correo de confirmación a:\n${_emailController.text}',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
             ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pushNamedAndRemoveUntil(
-                    '/login',
-                    (route) => false,
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                ),
-                child: const Text(
-                  'Iniciar Sesión',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
+            const SizedBox(height: 14),
           ],
         ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  '/login',
+                  (route) => false,
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+              child: const Text(
+                'Iniciar Sesión',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -261,134 +268,189 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       body: CircleBackground(
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              children: [
-                const SizedBox(height: 20),
-                Center(
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 100,
-                        height: 100,
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primaryColor.withOpacity(0.2),
-                              blurRadius: 15,
-                              spreadRadius: 5,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: IntrinsicHeight(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 20),
+                          Center(
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 100,
+                                  height: 100,
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(30),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.primaryColor.withOpacity(0.2),
+                                        blurRadius: 15,
+                                        spreadRadius: 5,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Image.asset('assets/logo.png', fit: BoxFit.contain),
+                                ),
+                                const SizedBox(height: 20),
+                                Text(
+                                  '¡Únase a Poli-Trueque!',
+                                  style: TextStyle(
+                                    color: AppTheme.primaryColor,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Complete el formulario con su correo institucional',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: Image.asset('assets/logo.png', fit: BoxFit.contain),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        '¡Únase a Poli-Trueque!',
-                        style: TextStyle(
-                          color: AppTheme.primaryColor,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Complete el formulario con su correo institucional',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 30),
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      TextFormField(
-                        controller: _nameController,
-                        decoration: _inputDecoration('Nombre completo', 'Ingrese su nombre', Icons.person),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Por favor ingrese su nombre';
-                          }
-                          if (value.trim().length < 3) {
-                            return 'El nombre debe tener al menos 3 caracteres';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: _inputDecoration('Correo institucional', 'ejemplo@espoch.edu.ec', Icons.email),
-                        validator: _validateEmail,
-                      ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: !_isPasswordVisible,
-                        decoration: _inputDecoration('Contraseña', 'Mín. 8 caracteres con letras, números y símbolos', Icons.lock, isPassword: true),
-                        validator: _validatePassword,
-                      ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        controller: _confirmPasswordController,
-                        obscureText: !_isConfirmPasswordVisible,
-                        decoration: _inputDecoration('Confirmar Contraseña', 'Repita su contraseña', Icons.lock_outline, isConfirmPassword: true),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Por favor confirme su contraseña';
-                          }
-                          if (value != _passwordController.text) {
-                            return 'Las contraseñas no coinciden';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 30),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 55,
-                        child: ElevatedButton(
-                          onPressed: _register,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryColor,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            elevation: 2,
                           ),
-                          child: const Text('Registrarse', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('¿Ya tiene una cuenta? ', style: TextStyle(color: Colors.grey[600])),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Text(
-                        'Iniciar Sesión',
-                        style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold),
+                          const SizedBox(height: 30),
+
+                          // Contenedor principal con el formulario
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                               color: Colors.white.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                children: [
+                                  // Campo Nombre Completo
+                                  TextFormField(
+                                    controller: _nameController,
+                                    decoration: _inputDecoration('Nombre completo', 'Ingrese su nombre', Icons.person),
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Por favor ingrese su nombre';
+                                      }
+                                      if (value.trim().length < 3) {
+                                        return 'El nombre debe tener al menos 3 caracteres';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // Campo Correo Institucional
+                                  TextFormField(
+                                    controller: _emailController,
+                                    keyboardType: TextInputType.emailAddress,
+                                    decoration: _inputDecoration('Correo institucional', 'ejemplo@espoch.edu.ec', Icons.email),
+                                    validator: _validateEmail,
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // Campo Contraseña
+                                  TextFormField(
+                                    controller: _passwordController,
+                                    obscureText: !_isPasswordVisible,
+                                    decoration: _inputDecoration('Contraseña', 'Mín. 8 caracteres con letras, números y símbolos', Icons.lock, isPassword: true),
+                                    validator: _validatePassword,
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // Campo Confirmar Contraseña
+                                  TextFormField(
+                                    controller: _confirmPasswordController,
+                                    obscureText: !_isConfirmPasswordVisible,
+                                    decoration: _inputDecoration('Confirmar Contraseña', 'Repita su contraseña', Icons.lock_outline, isConfirmPassword: true),
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Por favor confirme su contraseña';
+                                      }
+                                      if (value != _passwordController.text) {
+                                        return 'Las contraseñas no coinciden';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 30),
+
+                                  // Botón Registrarse
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 55,
+                                    child: ElevatedButton(
+                                      onPressed: _register,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.primaryColor,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        elevation: 5,
+                                      ),
+                                      child: const Text(
+                                        'Registrarse',
+                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // Enlace para Iniciar Sesión
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '¿Ya tiene una cuenta? ',
+                                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () => Navigator.pop(context),
+                                        child: Text(
+                                          'Iniciar Sesión',
+                                          style: TextStyle(
+                                            color: AppTheme.primaryColor,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            decoration: TextDecoration.underline,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 40),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
     );
   }
+
   InputDecoration _inputDecoration(String label, String hint, IconData icon, {bool isPassword = false, bool isConfirmPassword = false}) {
     bool isVisible;
     VoidCallback toggleVisibility;
@@ -417,10 +479,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
       filled: true,
       fillColor: Colors.grey.withOpacity(0.05),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!, width: 1)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2)),
-      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.red, width: 1.5)),
-      focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.red, width: 2)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.red, width: 1.5),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.red, width: 2),
+      ),
     );
   }
 }
