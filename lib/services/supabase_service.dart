@@ -35,16 +35,7 @@ class SupabaseService {
 
       if (res.user != null) {
         // 2. Insertar en la tabla usuarios con el rol por defecto
-        await client.from('usuarios').insert({
-          'id': res.user!.id,
-          'name': name, // CAMBIO: Columna corregida
-          'email': email, // CAMBIO: Columna corregida
-          'role': 'usuario',
-          'created_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
-        });
-
-        return {
+       return {
           'success': true,
           'message': 'Registro exitoso. Por favor revisa tu correo para confirmar.'
         };
@@ -178,25 +169,13 @@ class SupabaseService {
       print('📋 Obteniendo todos los usuarios...');
       
       // CORRECCIÓN: Obtener usuarios y el rol directamente de la tabla 'usuarios'
-      final usersData = await client
-          .from('usuarios')
-          .select('id, name, email, role, created_at, updated_at')
-          .order('created_at', ascending: false);
-
-      print('✅ Usuarios obtenidos de Supabase: ${usersData.length}');
+      final usersData = await client.rpc('get_all_users');
+        print('✅ Usuarios obtenidos de Supabase: ${usersData.length}');
       
-      // 👇 BLOQUE DE DEPURACIÓN AÑADIDO 👇
-      print('🔍 DEBUG (Datos Crudos de Supabase):');
-      for (var user in usersData) {
-        // Busca específicamente el usuario que debería ser admin
-        // CAMBIA 'NombreDelUsuarioAdmin' por el nombre real del admin
-        if (user['name'] == 'NombreDelUsuarioAdmin') {
-          print('  -> ENCONTRADO ADMIN: ID=${user['id']}, Role="${user['role']}" (Tipo: ${user['role'].runtimeType})');
-        }
-      }
+   
       // 👆 FIN DEL BLOQUE 👆
 
-      final List<Map<String, dynamic>> processedUsers = usersData.map((userData) {
+    final List<Map<String, dynamic>> processedUsers = List<Map<String, dynamic>>.from(usersData).map((userData) {
         return {
           'id': userData['id'],
           'name': userData['name'], // CAMBIO: Clave corregida
@@ -207,14 +186,6 @@ class SupabaseService {
         };
       }).toList();
 
-      // 👇 BLOQUE DE DEPURACIÓN AÑADIDO 👇
-      print('🔍 DEBUG (Datos Procesados para la App):');
-      for (var user in processedUsers) {
-        // CAMBIA 'NombreDelUsuarioAdmin' también aquí
-        if (user['name'] == 'NombreDelUsuarioAdmin') {
-          print('  -> ENCONTRADO ADMIN PROCESADO: ID=${user['id']}, Rol="${user['rol']}" (Tipo: ${user['rol'].runtimeType})');
-        }
-      }
       // 👆 FIN DEL BLOQUE 👆
 
       print('✅ Total procesados: ${processedUsers.length}');
@@ -259,8 +230,8 @@ class SupabaseService {
   /// Actualiza los datos de un usuario incluyendo su rol
   static Future<Map<String, dynamic>> updateUser({
     required String userId,
-    required String name, // CAMBIO: Parámetro renombrado
-    required String email, // CAMBIO: Parámetro renombrado
+    required String name, 
+    required String email, 
     required String rol,
   }) async {
     try {
@@ -302,7 +273,7 @@ class SupabaseService {
       try {
         await client.auth.admin.deleteUser(userId);
       } catch (e) {
-        print('⚠️ No se pudo eliminar del auth (puede requerir permisos): $e');
+        print(' No se pudo eliminar del auth (puede requerir permisos): $e');
       }
 
       return {
@@ -337,35 +308,7 @@ class SupabaseService {
     return [];
   }
 
-  /// Cambia el rol del usuario actualizando la tabla usuarios
-  static Future<Map<String, dynamic>> changeUserRole({
-    required String userId,
-    required String newRole,
-  }) async {
-    try {
-      await client
-          .from('usuarios')
-          .update({'role': newRole})
-          .eq('id', userId);
-
-      return {
-        'success': true, 
-        'message': 'Rol actualizado a $newRole exitosamente'
-      };
-    } on PostgrestException catch (e) {
-      return {
-        'success': false, 
-        'message': 'Error de base de datos: ${e.message}'
-      };
-    } catch (e) {
-      return {
-        'success': false, 
-        'message': 'Error inesperado al cambiar rol: $e'
-      };
-    }
-  }
-
-  // ==================== GESTIÓN DE PUNTOS ====================
+    // ==================== GESTIÓN DE PUNTOS ====================
 
   /// Actualizar puntos del usuario
   static Future<Map<String, dynamic>> updateUserPoints({
