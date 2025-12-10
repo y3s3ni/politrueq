@@ -40,22 +40,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
         print('Verificando si el email ya existe: $email');
       }
       
-      final response = await Supabase.instance.client.rpc(
-        'check_email_exists',
-        params: {'email_to_check': email},
-      );
-      
-      if (kDebugMode) {
-        print('Respuesta de la función RPC: $response');
+      // Método 1: Intentar usar la función RPC
+      try {
+        final response = await Supabase.instance.client.rpc(
+          'check_email_exists',
+          params: {'email_to_check': email},
+        );
+        
+        if (kDebugMode) {
+          print('Respuesta de la función RPC: $response');
+        }
+        
+        return response as bool? ?? false;
+      } catch (rpcError) {
+        if (kDebugMode) {
+          print('Función RPC no disponible, usando consulta directa: $rpcError');
+        }
+        
+        // Método 2: Consulta directa como respaldo
+        final response = await Supabase.instance.client
+            .from('usuarios')
+            .select('id')
+            .eq('email', email)
+            .maybeSingle();
+        
+        final exists = response != null;
+        
+        if (kDebugMode) {
+          print('Consulta directa - Email existe: $exists');
+        }
+        
+        return exists;
       }
-      
-      return response as bool? ?? false;
     } catch (e) {
-      // Si la llamada a la función falla, lo imprimimos para depurar
       if (kDebugMode) {
-        print('Error al llamar a la función check_email_exists: $e');
+        print('Error al verificar email: $e');
       }
-     return false;
+      return false;
     }
   }
 

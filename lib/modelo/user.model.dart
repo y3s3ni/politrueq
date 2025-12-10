@@ -45,10 +45,15 @@ class UserModel {
 
   // Get user initials for avatar
   String getInitials() {
-    final names = nombreCompleto.split(' ');
+    if (nombreCompleto.trim().isEmpty) {
+      return 'U';
+    }
+    
+    final names = nombreCompleto.trim().split(' ').where((name) => name.isNotEmpty).toList();
+    
     if (names.length >= 2) {
       return '${names[0][0]}${names[1][0]}'.toUpperCase();
-    } else if (names.isNotEmpty) {
+    } else if (names.isNotEmpty && names[0].isNotEmpty) {
       return names[0][0].toUpperCase();
     }
     return 'U';

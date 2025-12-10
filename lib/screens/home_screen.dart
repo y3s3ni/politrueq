@@ -1,14 +1,22 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:trueque/modelo/user.model.dart'; 
 import 'package:trueque/screens/chat_list_screen.dart';
 import 'package:trueque/screens/search_user_screen.dart';
+import 'package:trueque/screens/search_products_screen.dart';
+import 'package:trueque/widgets/puntos_widget.dart';
+import 'package:trueque/screens/mis_puntos_screen.dart';
+import 'package:trueque/screens/geolocalizacion_screen.dart';
+import 'package:trueque/screens/notificaciones_screen.dart';
+import 'package:trueque/screens/mapa_unificado_screen.dart';
 import 'login_screen.dart';
 import 'user_management_screen.dart';
-import 'map_screen.dart';
 import 'objects_screen.dart';
 import 'approval_screen.dart';
-import 'items_list_screen.dart'; 
+import 'items_list_screen.dart';
+import 'test_productos_unificados_screen.dart'; 
 
 class Category {
   final String id;
@@ -48,12 +56,17 @@ class _HomeScreenState extends State<HomeScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
+  int _unreadNotificationCount = 0;
+  StreamSubscription<List<Map<String, dynamic>>>? _notificationSubscription;
+
+
   @override
   void initState() {
     super.initState();
     _currentUser = widget.user;
     _originalRole = widget.user.rol;
     _refreshUserData();
+    _setupNotificationStream();
 
     _animationController = AnimationController(
       vsync: this,
@@ -68,6 +81,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void dispose() {
     _animationController.dispose();
+    _notificationSubscription?.cancel();
     super.dispose();
   }
 
@@ -89,14 +103,121 @@ class _HomeScreenState extends State<HomeScreen>
       print('❌ Error al refrescar datos del usuario: $e');
     }
   }
+  void _setupNotificationStream() {
+    final supabase = Supabase.instance.client;
+    final userId = _currentUser.id;
+
+    _notificationSubscription = supabase
+        .from('notificaciones')
+        .stream(primaryKey: ['id'])
+        .listen((data) {
+          if (mounted) {
+            final unreadCount = data.where((notification) {
+              return notification['user_id'] == userId &&
+                     notification['is_read'] == false && 
+                     notification['is_hidden'] == false;
+            }).length;
+
+            setState(() {
+              _unreadNotificationCount = unreadCount;
+            });
+            
+            debugPrint('🔔 Notificaciones no leídas: $unreadCount');
+          }
+        }, onError: (e) {
+          debugPrint('❌ Error en el stream de notificaciones: $e');
+        });
+  }
+
+  Future<void> _sendTestNotification() async {
+    final supabase = Supabase.instance.client;
+    final userId = _currentUser.id;
+
+    String relatedId = '00000000-0000-0000-0000-000000000000';
+    String senderName = 'Usuario de Prueba';
+
+    try {
+      final List<dynamic> otherUsers = await supabase
+          .from('usuarios')
+          .select('id, name')
+          .not('id', 'eq', userId)
+          .limit(1);
+
+      if (otherUsers.isNotEmpty) {
+        relatedId = otherUsers.first['id'];
+        senderName = otherUsers.first['name'];
+      }
+    } catch (e) {
+      debugPrint("No se pudo encontrar un remitente para la notificación de prueba: $e");
+    }
+
+    final List<Map<String, dynamic>> testNotifications = [
+      {
+        'type': 'mensaje',
+        'title': senderName,
+        'body': '¡Hola! ¿Sigue disponible el libro de Flutter?',
+        'related_id': relatedId,
+      },
+      {
+        'type': 'intercambio',
+        'title': 'Solicitud de Intercambio',
+        'body': '$senderName quiere intercambiar un objeto contigo.',
+        'related_id': relatedId,
+      },
+      {
+        'type': 'alerta',
+        'title': 'Alerta de Seguridad',
+        'body': 'Se ha iniciado sesión en tu cuenta desde un nuevo dispositivo.',
+        'related_id': null,
+      }
+    ];
+
+    final random = Random();
+    final template = testNotifications[random.nextInt(testNotifications.length)];
+
+    final Map<String, dynamic> finalNotification = {
+      'user_id': userId,
+      'type': template['type'],
+      'title': template['title'],
+      'body': template['body'],
+      'related_id': template['related_id'],
+      'is_read': false,
+      'is_hidden': false,
+    };
+
+    try {
+      await supabase.from('notificaciones').insert(finalNotification);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✔️ Notificación de prueba enviada.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error al enviar notificación: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      debugPrint('Error al enviar notificación de prueba: $e');
+    }
+  }
+
 
   final List<Category> _categories = const [
-    Category(id: 'electronics', name: 'Comida', icon: Icons.phone_android, color: Color(0xFF2563EB), count: 234),
-    Category(id: 'clothing', name: 'Ropa', icon: Icons.checkroom, color: Color(0xFF9333EA), count: 189),
-    Category(id: 'books', name: 'Útiles Escolares', icon: Icons.menu_book, color: Color(0xFF16A34A), count: 156),
-    Category(id: 'sports', name: 'Deportes', icon: Icons.sports_soccer, color: Color(0xFFEA580C), count: 98),
-    Category(id: 'home', name: 'Hogar', icon: Icons.home, color: Color(0xFFDC2626), count: 145),
-    Category(id: 'toys', name: 'Otros', icon: Icons.toys, color: Color(0xFFDB2777), count: 67),
+    Category(id: 'Electrónicos', name: 'Electrónicos', icon: Icons.phone_android, color: Color(0xFFEF233C), count: 0),
+    Category(id: 'Comida', name: 'Comida', icon: Icons.restaurant, color: Color(0xFFD90429), count: 0),
+    Category(id: 'Ropa', name: 'Ropa', icon: Icons.checkroom, color: Color(0xFFC1121F), count: 0),
+    Category(id: 'Útiles Escolares', name: 'Útiles Escolares', icon: Icons.school, color: Color(0xFFB91C1C), count: 0),
+    Category(id: 'Deportes', name: 'Deportes', icon: Icons.sports_soccer, color: Color(0xFF991B1B), count: 0),
+    Category(id: 'Hogar', name: 'Hogar', icon: Icons.home, color: Color(0xFF8D0801), count: 0),
+    Category(id: 'Otros', name: 'Otros', icon: Icons.toys, color: Color(0xFFDC2626), count: 0),
   ];
 
   @override
@@ -112,7 +233,23 @@ class _HomeScreenState extends State<HomeScreen>
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         actions: [
-          // 🔍 AÑADIDO: Buscar usuario para chatear
+          // ⭐ WIDGET DE PUNTOS
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: PuntosWidget(
+              userId: _currentUser.id,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MisPuntosScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+          
+          // 🔍 Buscar usuario para chatear
           IconButton(
             icon: const Icon(Icons.search, color: Colors.white),
             tooltip: 'Buscar usuarios',
@@ -124,7 +261,7 @@ class _HomeScreenState extends State<HomeScreen>
             },
           ),
           
-          // 💬 AÑADIDO: Ver lista de chats
+          // 💬 Ver lista de chats
           IconButton(
             icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
             tooltip: 'Mis chats',
@@ -136,18 +273,45 @@ class _HomeScreenState extends State<HomeScreen>
             },
           ),
           
-          // 🔔 Notificaciones (ya existía)
+          // 🔔 Notificaciones con badge dinámico
           IconButton(
             icon: Stack(
-              children: const [
-                Icon(Icons.notifications, color: Colors.white),
-                Positioned(right: 0, top: 0, child: Icon(Icons.circle, color: Colors.red, size: 8)),
+              children: [
+                const Icon(Icons.notifications, color: Colors.white),
+                if (_unreadNotificationCount > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        _unreadNotificationCount > 9 ? '9+' : '$_unreadNotificationCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
               ],
             ),
             tooltip: 'Notificaciones',
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('No tienes notificaciones nuevas'), backgroundColor: Color(0xFFEF233C)),
-            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotificacionesScreen()),
+              );
+            },
           ),
         ],
       ),
@@ -277,20 +441,38 @@ class _HomeScreenState extends State<HomeScreen>
       children: [
         _buildMenuSectionTitle('MENÚ PRINCIPAL'),
         _buildMenuItem(Icons.home, 'Inicio', () {}),
-        _buildMenuItem(Icons.search, 'Buscar', () {}),
+        _buildMenuItem(Icons.search, 'Buscar', () {
+          Navigator.pop(context);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchProductsScreen()));
+        }),
         _buildMenuItem(Icons.swap_horiz, 'Mis Objetos', () {
           Navigator.pop(context);
           Navigator.push(context, MaterialPageRoute(builder: (context) => ObjectsScreen(currentUser: _currentUser)));
         }),
-        // AÑADIDO: Opción de mensajes en el menú lateral
+        // ⭐ AÑADIDO: Mis Puntos
+        _buildMenuItem(Icons.stars, 'Mis Puntos', () {
+          Navigator.pop(context);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const MisPuntosScreen()));
+        }),
+        // 💬 Mensajes
         _buildMenuItem(Icons.chat_bubble, 'Mensajes', () {
           Navigator.pop(context);
           Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatListScreen()));
         }),
+        // 🔔 Notificaciones con badge
+        _buildMenuItemWithBadge(
+          Icons.notifications,
+          'Notificaciones',
+          _unreadNotificationCount,
+          () {
+            Navigator.pop(context);
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificacionesScreen()));
+          },
+        ),
         _buildMenuItem(Icons.person, 'Perfil', () {}),
-        _buildMenuItem(Icons.map, 'Mapa', () {
+        _buildMenuItem(Icons.map, 'Mapa Interactivo', () {
           Navigator.pop(context);
-          Navigator.push(context, MaterialPageRoute(builder: (context) => MapScreen(currentUser: _currentUser)));
+          Navigator.push(context, MaterialPageRoute(builder: (context) => MapaUnificadoScreen(currentUser: _currentUser)));
         }),
         if (_canChangeRole()) ...[
           _buildMenuSectionTitle('ADMINISTRACIÓN'),
@@ -302,6 +484,11 @@ class _HomeScreenState extends State<HomeScreen>
           }),
           _buildMenuItem(Icons.admin_panel_settings, 'Cambiar Rol', _showRoleChangeDialog),
         ],
+        _buildMenuSectionTitle('PRUEBAS'),
+        _buildMenuItem(Icons.science, 'Test Sistema Unificado', () {
+          Navigator.pop(context);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const TestProductosUnificadosScreen()));
+        }),
         _buildMenuSectionTitle('CONFIGURACIÓN'),
         _buildSettingItem(Icons.dark_mode, 'Modo Oscuro', _isDarkMode, (value) => setState(() => _isDarkMode = value)),
         _buildSettingItem(Icons.notifications, 'Notificaciones', _notificationsEnabled, (value) => setState(() => _notificationsEnabled = value)),
@@ -329,6 +516,81 @@ class _HomeScreenState extends State<HomeScreen>
               Icon(icon, size: 20, color: Colors.grey.shade700),
               const SizedBox(width: 12),
               Expanded(child: Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey.shade700))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuItemWithBadge(IconData icon, String title, int badgeCount, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(icon, size: 20, color: Colors.grey.shade700),
+                  if (badgeCount > 0)
+                    Positioned(
+                      right: -8,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFEF233C),
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          badgeCount > 9 ? '9+' : '$badgeCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: badgeCount > 0 ? FontWeight.w600 : FontWeight.w500,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ),
+              if (badgeCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF233C).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$badgeCount',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFEF233C),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -543,12 +805,19 @@ class _CategoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ItemsListScreen(category: category),
-          ),
-        );
+        // Necesitamos acceder al currentUser del HomeScreen
+        final homeState = context.findAncestorStateOfType<_HomeScreenState>();
+        if (homeState != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ItemsListScreen(
+                category: category,
+                currentUser: homeState._currentUser,
+              ),
+            ),
+          );
+        }
       },
       borderRadius: BorderRadius.circular(20),
       child: Container(

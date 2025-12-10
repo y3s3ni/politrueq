@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -136,24 +137,46 @@ class _AddProductScreenState extends State<AddProductScreen> {
       for (final image in _selectedImages) {
         final imageBytes = await image.readAsBytes();
         final imageExtension = image.path.split('.').last.toLowerCase();
-        final imageFileName = 'public/${user.id}/${DateTime.now().millisecondsSinceEpoch}_${_selectedImages.indexOf(image)}.$imageExtension';
+        final imageFileName = '${user.id}/${DateTime.now().millisecondsSinceEpoch}_${_selectedImages.indexOf(image)}.$imageExtension';
 
-        await Supabase.instance.client.storage.from('articulos').uploadBinary(
+        await Supabase.instance.client.storage.from('productos_unificados').uploadBinary(
               imageFileName,
               imageBytes,
               fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
             );
-        imageUrls.add(Supabase.instance.client.storage.from('articulos').getPublicUrl(imageFileName));
+        imageUrls.add(Supabase.instance.client.storage.from('productos_unificados').getPublicUrl(imageFileName));
       }
 
-      await Supabase.instance.client.from('articulos').insert({
-        'nombre_producto': _nombreController.text,
+      // Obtener nombre de categoría desde el ID
+      final categoriaResponse = await Supabase.instance.client
+          .from('categorias')
+          .select('nombre_categoria')
+          .eq('id_categoria', _selectedCategoryId!)
+          .single();
+      
+      final categoriaNombre = categoriaResponse['nombre_categoria'] as String;
+      
+      // Determinar estado físico según puntos
+      String estadoFisico;
+      if (_selectedPointsValue! <= 2) {
+        estadoFisico = 'para_reparar';
+      } else if (_selectedPointsValue! <= 4) {
+        estadoFisico = 'usado';
+      } else {
+        estadoFisico = 'buen_estado';
+      }
+
+      await Supabase.instance.client.from('productos_unificados').insert({
+        'nombre': _nombreController.text,
         'descripcion': _descripcionController.text,
-        'id_categoria': _selectedCategoryId,
+        'categoria': categoriaNombre,
+        'estado_fisico': estadoFisico,
         'puntos_necesarios': _selectedPointsValue,
-        'ubicacion_aproximada': _ubicacionController.text,
+        'ubicacion': _ubicacionController.text,
         'image_urls': imageUrls,
-        'id_usuario': user.id,
+        'usuario_id': user.id,
+        'disponible': true,
+        'estado_aprobacion': 'pendiente',
       });
 
       if (mounted) {
@@ -297,9 +320,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: kIsWeb
-                          ? Image.network(imageFile.path, width: 100, height: 100, fit: BoxFit.cover)
-                          : Image.file(File(imageFile.path), width: 100, height: 100, fit: BoxFit.cover),
+                      child: FutureBuilder<Uint8List>(
+                        future: imageFile.readAsBytes(),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData) {
+                            return Image.memory(snapshot.data!, width: 100, height: 100, fit: BoxFit.cover);
+                          }
+                          return Container(
+                            width: 100,
+                            height: 100,
+                            color: Colors.grey[300],
+                            child: const Center(child: CircularProgressIndicator()),
+                          );
+                        },
+                      ),
                     ),
                     Positioned(
                       top: -8, right: -8,

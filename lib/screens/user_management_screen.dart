@@ -31,20 +31,34 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   }
 
   Future<void> _loadUsers() async {
+    print('🔄 _loadUsers() iniciado');
     setState(() => _isLoading = true);
     
     try {
+      print('📡 Llamando a SupabaseService.getAllUsers()...');
       final result = await SupabaseService.getAllUsers();
+      
+      print('📦 Respuesta recibida: success=${result['success']}');
       
       if (result['success'] && mounted) {
         final List<dynamic> usersData = result['data'];
+        print('📊 Datos recibidos: ${usersData.length} usuarios');
+        
+        // Mostrar los primeros 3 usuarios para debug
+        for (int i = 0; i < (usersData.length > 3 ? 3 : usersData.length); i++) {
+          print('   Usuario $i: ${usersData[i]['name']} - Rol: ${usersData[i]['role']}');
+        }
+        
         setState(() {
           _users = usersData.map((data) => UserModel.fromJson(data)).toList();
           _isLoading = false;
         });
+        
+        print('✅ Estado actualizado con ${_users.length} usuarios');
       } else {
         if (mounted) {
           setState(() => _isLoading = false);
+          print('❌ Error al cargar usuarios: ${result['message']}');
           _showSnackBar(
             result['message'] ?? 'Error al cargar usuarios',
             isError: true,
@@ -54,6 +68,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
+        print('💥 Excepción en _loadUsers: $e');
         _showSnackBar('Error: $e', isError: true);
       }
     }
@@ -129,27 +144,32 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     _showLoadingDialog('Eliminando usuario...');
 
     try {
-      // Añadimos un log para depurar qué se está enviando al servicio
-      print('Intentando eliminar usuario con ID: ${user.id}');
+      print('🗑️ UI: Intentando eliminar usuario');
+      print('   ID: ${user.id}');
+      print('   Nombre: ${user.nombreCompleto}');
+      print('   Email: ${user.correoElectronico}');
+      
       final result = await SupabaseService.deleteUser(user.id);
       
       if (!mounted) return;
       Navigator.pop(context); // Cerrar diálogo de carga
 
-      // --- CORRECCIÓN 3: Manejo de errores más detallado ---
+      print('📊 UI: Resultado recibido: ${result['success']}');
+      
       if (result['success']) {
+        print('✅ UI: Eliminación exitosa, recargando lista...');
         _showSnackBar('Usuario eliminado exitosamente');
-        _loadUsers();
+        await _loadUsers();
+        print('✅ UI: Lista recargada, total usuarios: ${_users.length}');
       } else {
-        // Muestra el mensaje de error exacto que viene del backend
         final errorMessage = result['message'] ?? result['error'] ?? 'Error desconocido al eliminar usuario';
-        print('Error al eliminar usuario: $errorMessage'); // Log para depuración
+        print('❌ UI: Error al eliminar: $errorMessage');
         _showSnackBar(errorMessage, isError: true);
       }
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
-      print('Excepción al eliminar usuario: $e'); // Log para depuración
+      print('💥 UI: Excepción al eliminar usuario: $e');
       _showSnackBar('Error del cliente: $e', isError: true);
     }
   }
@@ -259,29 +279,64 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     _showLoadingDialog('Actualizando usuario...');
 
     try {
-      print('Actualizando usuario ${user.id} con rol: $selectedRole'); // Log para depuración
+      print('🔄 Iniciando actualización de usuario ${user.id}');
+      print('   📝 Nombre: ${nombreController.text}');
+      print('   📧 Email: ${emailController.text}');
+      print('   🎭 Rol seleccionado: $selectedRole');
+      
       final updateResult = await SupabaseService.updateUser(
         userId: user.id,
         name: nombreController.text,
         email: emailController.text,
-        rol: selectedRole, // Pasa el rol canónico normalizado
+        rol: selectedRole,
       );
       
       if (!mounted) return;
       Navigator.pop(context);
 
+      print('📊 Resultado de actualización: ${updateResult['success']}');
+
       if (updateResult['success']) {
         _showSnackBar('Usuario actualizado exitosamente');
-        _loadUsers();
+        
+        print('⏳ Esperando 500ms antes de recargar...');
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        print('🔄 Recargando lista de usuarios...');
+        await _loadUsers();
+        
+        print('✅ Lista de usuarios recargada');
+        print('📋 Total de usuarios en memoria: ${_users.length}');
+        
+        // Verificar si el usuario actualizado está en la lista
+        final updatedUser = _users.firstWhere(
+          (u) => u.id == user.id,
+          orElse: () => UserModel(
+            id: '',
+            nombreCompleto: '',
+            correoElectronico: '',
+            rol: '',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+        );
+        
+        if (updatedUser.id.isNotEmpty) {
+          print('👤 Usuario actualizado encontrado en lista:');
+          print('   Nombre: ${updatedUser.nombreCompleto}');
+          print('   Rol: ${updatedUser.rol}');
+        } else {
+          print('⚠️ Usuario actualizado NO encontrado en lista');
+        }
       } else {
         final errorMessage = updateResult['message'] ?? updateResult['error'] ?? 'Error desconocido al actualizar';
-        print('Error al actualizar usuario: $errorMessage'); // Log para depuración
+        print('❌ Error al actualizar usuario: $errorMessage');
         _showSnackBar(errorMessage, isError: true);
       }
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
-      print('Excepción al actualizar usuario: $e'); // Log para depuración
+      print('💥 Excepción al actualizar usuario: $e');
       _showSnackBar('Error del cliente: $e', isError: true);
     }
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:trueque/modelo/user.model.dart';
-import '../services/supabase_service.dart';
+import '../modelo/producto_unificado_model.dart';
+import '../services/productos_unificados_service.dart';
 
 class ApprovalScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -11,7 +12,7 @@ class ApprovalScreen extends StatefulWidget {
 }
 
 class _ApprovalScreenState extends State<ApprovalScreen> {
-  List<Map<String, dynamic>> _objetosPendientes = [];
+  List<ProductoUnificado> _productosPendientes = [];
   bool _isLoading = true;
 
   @override
@@ -23,37 +24,17 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
   Future<void> _loadPendientes() async {
     setState(() => _isLoading = true);
     
-    final result = await SupabaseService.getObjetosPendientes();
+    final result = await ProductosUnificadosService.getProductosPendientes();
     
     if (mounted) {
       setState(() {
         if (result['success']) {
-          _objetosPendientes = List<Map<String, dynamic>>.from(result['data']);
+          // Convertir los datos a ProductoUnificado
+          final data = result['data'] as List;
+          _productosPendientes = data.map((item) => ProductoUnificado.fromJson(item)).toList();
         }
         _isLoading = false;
       });
-    }
-  }
-
-  String _getEstadoLabel(String estado) {
-    switch (estado) {
-      case 'nuevo': return 'Nuevo';
-      case 'como_nuevo': return 'Como nuevo';
-      case 'buen_estado': return 'Buen estado';
-      case 'usado': return 'Usado';
-      case 'para_reparar': return 'Para reparar';
-      default: return estado;
-    }
-  }
-
-  Color _getEstadoColor(String estado) {
-    switch (estado) {
-      case 'nuevo': return Colors.green;
-      case 'como_nuevo': return Colors.lightGreen;
-      case 'buen_estado': return Colors.blue;
-      case 'usado': return Colors.orange;
-      case 'para_reparar': return Colors.red;
-      default: return Colors.grey;
     }
   }
 
@@ -84,7 +65,7 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
                                 const CircularProgressIndicator(color: Color(0xFFEF233C)),
                                 const SizedBox(height: 16),
                                 Text(
-                                  'Cargando objetos pendientes...',
+                                  'Cargando productos pendientes...',
                                   style: TextStyle(fontWeight: FontWeight.w600),
                                 ),
                               ],
@@ -153,7 +134,7 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
                         maxLines: 1,
                       ),
                     ),
-                    if (_objetosPendientes.isNotEmpty)
+                    if (_productosPendientes.isNotEmpty)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
@@ -161,7 +142,7 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          '${_objetosPendientes.length}',
+                          '${_productosPendientes.length}',
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -180,7 +161,7 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
   }
 
   Widget _buildContent() {
-    if (_objetosPendientes.isEmpty) {
+    if (_productosPendientes.isEmpty) {
       return Center(
         child: Container(
           margin: const EdgeInsets.all(20),
@@ -213,17 +194,17 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
       onRefresh: _loadPendientes,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: _objetosPendientes.length,
+        itemCount: _productosPendientes.length,
         itemBuilder: (context, index) {
-          final objeto = _objetosPendientes[index];
-          return _buildObjetoCard(objeto);
+          final producto = _productosPendientes[index];
+          return _buildProductoCard(producto);
         },
       ),
     );
   }
 
-  Widget _buildObjetoCard(Map<String, dynamic> objeto) {
-    final usuario = objeto['usuarios'];
+  Widget _buildProductoCard(ProductoUnificado producto) {
+    final primeraImagen = producto.imageUrls.isNotEmpty ? producto.imageUrls.first : null;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -241,14 +222,15 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (objeto['imagen_url'] != null)
+          // Imagen
+          if (primeraImagen != null)
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               child: Image.network(
-                objeto['imagen_url'],
+                primeraImagen,
                 height: 200,
                 width: double.infinity,
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) => Container(
                   height: 200,
                   color: Colors.grey[300],
@@ -273,11 +255,12 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Nombre y Estado Físico
                 Row(
                   children: [
                     Expanded(
                       child: Text(
-                        objeto['nombre'],
+                        producto.nombre,
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -287,15 +270,15 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _getEstadoColor(objeto['estado']).withOpacity(0.2),
+                        color: _getEstadoColor(producto.estadoFisico).withOpacity(0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        _getEstadoLabel(objeto['estado']),
+                        producto.getEstadoFisicoLabel(),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: _getEstadoColor(objeto['estado']),
+                          color: _getEstadoColor(producto.estadoFisico),
                         ),
                       ),
                     ),
@@ -304,8 +287,9 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
                 
                 const SizedBox(height: 8),
                 
+                // Descripción
                 Text(
-                  objeto['descripcion'],
+                  producto.descripcion,
                   style: TextStyle(color: Colors.grey[700]),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
@@ -313,56 +297,77 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
 
                 const SizedBox(height: 12),
 
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
+                // Información del producto
+                Row(
+                  children: [
+                    _buildInfoChip(
+                      Icons.category,
+                      producto.categoria,
+                      Colors.blue,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildInfoChip(
+                      Icons.stars,
+                      producto.getPuntosLabel(),
+                      Colors.orange,
+                    ),
+                  ],
+                ),
+
+                if (producto.ubicacion != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: const BoxDecoration(
-                          color: Colors.blue,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.person, color: Colors.white, size: 20),
-                      ),
-                      const SizedBox(width: 12),
+                      Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                      const SizedBox(width: 4),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              usuario['nombre_completo'],
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
-                            Text(
-                              usuario['correo_electronico'],
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          producto.ubicacion!,
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-                ),
+                ],
 
                 const SizedBox(height: 12),
 
+                // Número de imágenes
+                if (producto.imageUrls.length > 1)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.photo_library, size: 16, color: Colors.purple),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${producto.imageUrls.length} imágenes',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.purple,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                const SizedBox(height: 12),
+
+                // Fecha
                 Row(
                   children: [
                     const Icon(Icons.schedule, size: 16, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
-                      'Enviado: ${_formatDate(objeto['creado_en'])}',
+                      'Enviado: ${_formatDate(producto.creadoEn)}',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -373,11 +378,12 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
 
                 const SizedBox(height: 16),
 
+                // Botones de acción
                 Row(
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () => _showRejectDialog(objeto),
+                        onPressed: () => _showRejectDialog(producto),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red,
                           shape: RoundedRectangleBorder(
@@ -394,7 +400,7 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () => _confirmarAprobar(objeto),
+                        onPressed: () => _showApproveDialog(producto),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           shape: RoundedRectangleBorder(
@@ -418,74 +424,438 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
     );
   }
 
-  String _formatDate(String? dateStr) {
-    if (dateStr == null) return 'Fecha desconocida';
-    try {
-      final date = DateTime.parse(dateStr);
-      return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
-      return 'Fecha desconocida';
-    }
-  }
-
-  void _confirmarAprobar(Map<String, dynamic> objeto) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.green),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                '¿Aprobar objeto?',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+  Widget _buildInfoChip(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
             ),
-          ],
-        ),
-        content: Text(
-          '¿Confirmas que deseas aprobar "${objeto['nombre']}"? El objeto será visible para todos los usuarios.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text('Cancelar', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              
-              final result = await SupabaseService.aprobarObjeto(objeto['id']);
-              
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      result['success'] ? '✅ Objeto aprobado' : '❌ ${result['message']}',
-                    ),
-                    backgroundColor: result['success'] ? Colors.green : const Color(0xFFEF233C),
-                  ),
-                );
-                
-                if (result['success']) _loadPendientes();
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: Text('Aprobar', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  void _showRejectDialog(Map<String, dynamic> objeto) {
+  Color _getEstadoColor(String estado) {
+    switch (estado) {
+      case 'nuevo':
+        return Colors.green;
+      case 'como_nuevo':
+        return Colors.lightGreen;
+      case 'buen_estado':
+        return Colors.blue;
+      case 'usado':
+        return Colors.orange;
+      case 'para_reparar':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _showApproveDialog(ProductoUnificado producto) {
+    int puntosFinales = producto.puntosNecesarios;
+    bool puntosConfirmados = false;
+    String categoriaFinal = producto.categoria;
+    bool categoriaConfirmada = false;
+    final screenContext = context; // Guardar referencia al contexto de la pantalla
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.green),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Aprobar producto',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Producto: "${producto.nombre}"',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Categoría: ${producto.categoria}',
+                  style: TextStyle(color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Estado físico: ${producto.getEstadoFisicoLabel()}',
+                  style: TextStyle(color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 16),
+                
+                // Puntos actuales/finales
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: puntosConfirmados 
+                        ? Colors.green.withOpacity(0.1)
+                        : Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: puntosConfirmados 
+                        ? Border.all(color: Colors.green, width: 2)
+                        : null,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        puntosConfirmados ? Icons.check_circle : Icons.stars, 
+                        color: puntosConfirmados ? Colors.green : Colors.blue,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          puntosConfirmados 
+                              ? 'Puntos confirmados: $puntosFinales'
+                              : 'Puntos asignados: ${producto.puntosNecesarios}',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                Text(
+                  '¿Ajustar puntos? (opcional)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Si los puntos no coinciden con el estado del producto, puedes ajustarlos:',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 12),
+                
+                // Opciones de puntos
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: OpcionesPuntos.opciones.map((opcion) {
+                    final puntos = opcion['value'] as int;
+                    final isSelected = puntosFinales == puntos;
+                    
+                    return ChoiceChip(
+                      label: Text(
+                        '$puntos pts',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isSelected ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      selected: isSelected,
+                      selectedColor: Colors.orange,
+                      onSelected: (selected) {
+                        setDialogState(() {
+                          if (selected) {
+                            puntosFinales = puntos;
+                            puntosConfirmados = false; // Resetear confirmación al cambiar
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                
+                // Mostrar cambio de puntos
+                if (puntosFinales != producto.puntosNecesarios) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Cambio de puntos: ${producto.puntosNecesarios} → $puntosFinales',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.orange[900],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (!puntosConfirmados) ...[
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                setDialogState(() {
+                                  puntosConfirmados = true;
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              icon: Icon(Icons.check, color: Colors.white, size: 18),
+                              label: Text(
+                                'Confirmar cambio de puntos',
+                                style: TextStyle(color: Colors.white, fontSize: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+                
+                // Separador
+                const SizedBox(height: 24),
+                Divider(color: Colors.grey[300]),
+                const SizedBox(height: 16),
+                
+                // Sección de Categoría
+                Text(
+                  '¿Ajustar categoría? (opcional)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Si la categoría no es correcta, puedes cambiarla:',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 12),
+                
+                // Opciones de categoría
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: Categorias.lista.map((cat) {
+                    final isSelected = categoriaFinal == cat;
+                    
+                    return ChoiceChip(
+                      label: Text(
+                        cat,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isSelected ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      selected: isSelected,
+                      selectedColor: Colors.purple,
+                      onSelected: (selected) {
+                        setDialogState(() {
+                          if (selected) {
+                            categoriaFinal = cat;
+                            categoriaConfirmada = false; // Resetear confirmación al cambiar
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                
+                // Mostrar cambio de categoría
+                if (categoriaFinal != producto.categoria) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.purple),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.purple, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Cambio de categoría: ${producto.categoria} → $categoriaFinal',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.purple[900],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (!categoriaConfirmada) ...[
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                setDialogState(() {
+                                  categoriaConfirmada = true;
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.purple,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              icon: Icon(Icons.check, color: Colors.white, size: 18),
+                              label: Text(
+                                'Confirmar cambio de categoría',
+                                style: TextStyle(color: Colors.white, fontSize: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: ((puntosFinales != producto.puntosNecesarios && !puntosConfirmados) ||
+                         (categoriaFinal != producto.categoria && !categoriaConfirmada))
+                  ? null // Deshabilitar si hay cambios sin confirmar
+                  : () async {
+                      Navigator.pop(dialogContext);
+                      
+                      final puntosAjustados = puntosFinales != producto.puntosNecesarios 
+                          ? puntosFinales 
+                          : null;
+                      
+                      final categoriaAjustada = categoriaFinal != producto.categoria
+                          ? categoriaFinal
+                          : null;
+                      
+                      print('🔍 DEBUG: Aprobando producto ${producto.id}');
+                      print('🔍 DEBUG: Puntos originales: ${producto.puntosNecesarios}');
+                      print('🔍 DEBUG: Puntos finales: $puntosFinales');
+                      print('🔍 DEBUG: Puntos ajustados a enviar: $puntosAjustados');
+                      print('🔍 DEBUG: Categoría original: ${producto.categoria}');
+                      print('🔍 DEBUG: Categoría final: $categoriaFinal');
+                      print('🔍 DEBUG: Categoría ajustada a enviar: $categoriaAjustada');
+                      
+                      final result = await ProductosUnificadosService.aprobarProducto(
+                        producto.id,
+                        puntosAjustados: puntosAjustados,
+                        categoriaAjustada: categoriaAjustada,
+                      );
+                      
+                      print('🔍 DEBUG: Resultado: ${result['success']}');
+                      
+                      if (!mounted) {
+                        print('🔍 DEBUG: Widget no montado, no se puede actualizar');
+                        return;
+                      }
+                      
+                      print('🔍 DEBUG: Mostrando SnackBar');
+                      
+                      String mensaje = '✅ Producto aprobado';
+                      if (result['success']) {
+                        List<String> cambios = [];
+                        if (puntosAjustados != null) {
+                          cambios.add('$puntosFinales puntos');
+                        }
+                        if (categoriaAjustada != null) {
+                          cambios.add('categoría: $categoriaFinal');
+                        }
+                        if (cambios.isNotEmpty) {
+                          mensaje = '✅ Producto aprobado con ${cambios.join(', ')}';
+                        }
+                      } else {
+                        mensaje = '❌ ${result['message']}';
+                      }
+                      
+                      ScaffoldMessenger.of(screenContext).showSnackBar(
+                        SnackBar(
+                          content: Text(mensaje),
+                          backgroundColor: result['success'] ? Colors.green : const Color(0xFFEF233C),
+                          duration: Duration(seconds: 3),
+                        ),
+                      );
+                      
+                      if (result['success']) {
+                        print('🔍 DEBUG: Removiendo producto ${producto.id} de la lista');
+                        print('🔍 DEBUG: Lista antes: ${_productosPendientes.length} productos');
+                        
+                        // Remover el producto de la lista inmediatamente
+                        setState(() {
+                          _productosPendientes.removeWhere((p) => p.id == producto.id);
+                        });
+                        
+                        print('🔍 DEBUG: Lista después: ${_productosPendientes.length} productos');
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text('Aprobar', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showRejectDialog(ProductoUnificado producto) {
     final motivoController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    final screenContext = context; // Guardar referencia al contexto de la pantalla
 
     showDialog(
       context: context,
@@ -497,7 +867,7 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Rechazar objeto',
+                'Rechazar producto',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
@@ -510,7 +880,7 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Objeto: "${objeto['nombre']}"',
+                'Producto: "${producto.nombre}"',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 16),
@@ -523,7 +893,7 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
                 controller: motivoController,
                 maxLines: 3,
                 decoration: InputDecoration(
-                  hintText: 'Explica por qué rechazas este objeto...',
+                  hintText: 'Explica por qué rechazas este producto...',
                   filled: true,
                   fillColor: Colors.grey[100],
                   border: OutlineInputBorder(
@@ -534,6 +904,21 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
                 validator: (v) => v == null || v.trim().isEmpty 
                     ? 'Debes proporcionar un motivo' 
                     : null,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Motivos comunes:',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildMotivoChip('Imágenes de baja calidad', motivoController),
+                  _buildMotivoChip('Descripción incompleta', motivoController),
+                  _buildMotivoChip('Estado no coincide', motivoController),
+                ],
               ),
             ],
           ),
@@ -548,22 +933,37 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
               if (formKey.currentState!.validate()) {
                 Navigator.pop(dialogContext);
                 
-                final result = await SupabaseService.rechazarObjeto(
-                  objeto['id'],
+                final result = await ProductosUnificadosService.rechazarProducto(
+                  producto.id,
                   motivoController.text.trim(),
                 );
                 
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        result['success'] ? '✅ Objeto rechazado' : '❌ ${result['message']}',
-                      ),
-                      backgroundColor: result['success'] ? Colors.orange : const Color(0xFFEF233C),
+                if (!mounted) {
+                  print('🔍 DEBUG: Widget no montado, no se puede actualizar');
+                  return;
+                }
+                
+                print('🔍 DEBUG: Mostrando SnackBar de rechazo');
+                ScaffoldMessenger.of(screenContext).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      result['success'] ? '✅ Producto rechazado' : '❌ ${result['message']}',
                     ),
-                  );
+                    backgroundColor: result['success'] ? Colors.orange : const Color(0xFFEF233C),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+                
+                if (result['success']) {
+                  print('🔍 DEBUG: Removiendo producto rechazado ${producto.id}');
+                  print('🔍 DEBUG: Lista antes: ${_productosPendientes.length} productos');
                   
-                  if (result['success']) _loadPendientes();
+                  // Remover el producto de la lista inmediatamente
+                  setState(() {
+                    _productosPendientes.removeWhere((p) => p.id == producto.id);
+                  });
+                  
+                  print('🔍 DEBUG: Lista después: ${_productosPendientes.length} productos');
                 }
               }
             },
@@ -574,6 +974,21 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
             child: Text('Rechazar', style: TextStyle(color: Colors.white)),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMotivoChip(String motivo, TextEditingController controller) {
+    return InkWell(
+      onTap: () => controller.text = motivo,
+      child: Chip(
+        label: Text(
+          motivo,
+          style: TextStyle(fontSize: 11),
+        ),
+        backgroundColor: Colors.grey[200],
+        padding: EdgeInsets.zero,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
   }

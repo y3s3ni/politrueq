@@ -19,8 +19,8 @@ class SupabaseService {
 
   /// Registro de usuario
   static Future<Map<String, dynamic>> registerUser({
-    required String name, // CAMBIO: Parámetro renombrado
-    required String email, // CAMBIO: Parámetro renombrado
+    required String name, 
+    required String email, 
     required String contrasena,
   }) async {
     try {
@@ -29,7 +29,7 @@ class SupabaseService {
         email: email,
         password: contrasena,
         data: {
-          'name': name, // CAMBIO: Metadato renombrado
+          'name': name, 
         },
       );
 
@@ -69,7 +69,7 @@ class SupabaseService {
 
   /// Iniciar Sesión con datos de usuario (usado por login_screen.dart)
   static Future<Map<String, dynamic>> loginUser({
-    required String email, // CAMBIO: Parámetro renombrado
+    required String email, 
     required String contrasena,
   }) async {
     try {
@@ -79,7 +79,7 @@ class SupabaseService {
       );
 
       if (response.user != null) {
-        // CORRECCIÓN: Obtener datos del usuario incluyendo el rol directamente
+       
         final userData = await client
             .from('usuarios')
             .select('id, name, email, role, created_at, updated_at') 
@@ -130,7 +130,6 @@ class SupabaseService {
     return client.auth.currentUser;
   }
 
-  /// Verificar si hay una sesión activa
   static bool isLoggedIn() {
     return client.auth.currentUser != null;
   }
@@ -170,23 +169,25 @@ class SupabaseService {
       
       // CORRECCIÓN: Obtener usuarios y el rol directamente de la tabla 'usuarios'
       final usersData = await client.rpc('get_all_users');
-        print('✅ Usuarios obtenidos de Supabase: ${usersData.length}');
+        print('Usuarios obtenidos de Supabase: ${usersData.length}');
       
    
-      // 👆 FIN DEL BLOQUE 👆
+      //  FIN DEL BLOQUE 
 
     final List<Map<String, dynamic>> processedUsers = List<Map<String, dynamic>>.from(usersData).map((userData) {
+        final role = userData['role'] ?? 'usuario';
+        print(' Usuario: ${userData['name']} - Rol en BD: $role');
         return {
           'id': userData['id'],
-          'name': userData['name'], // CAMBIO: Clave corregida
-          'email': userData['email'], // CAMBIO: Clave corregida
-          'rol': userData['role'] ?? 'usuario',
+          'name': userData['name'],
+          'email': userData['email'],
+          'role': role, 
           'created_at': userData['created_at'],
           'updated_at': userData['updated_at'],
         };
       }).toList();
 
-      // 👆 FIN DEL BLOQUE 👆
+      //  FIN DEL BLOQUE 
 
       print('✅ Total procesados: ${processedUsers.length}');
 
@@ -235,26 +236,35 @@ class SupabaseService {
     required String rol,
   }) async {
     try {
+      print('🔄 Actualizando usuario $userId');
+      print('   Nombre: $name');
+      print('   Email: $email');
+      print('   Rol: $rol');
+      
       await client
           .from('usuarios')
           .update({
-            'name': name, // CAMBIO: Columna corregida
-            'email': email, // CAMBIO: Columna corregida
+            'name': name, 
+            'email': email, 
             'role': rol,
             'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('id', userId);
+
+      print('✅ Usuario actualizado exitosamente en BD');
 
       return {
         'success': true,
         'message': 'Usuario actualizado exitosamente',
       };
     } on PostgrestException catch (e) {
+      print('❌ Error PostgrestException: ${e.message}');
       return {
         'success': false,
         'message': 'Error de base de datos: ${e.message}',
       };
     } catch (e) {
+      print('❌ Error general: $e');
       return {
         'success': false,
         'message': 'Error al actualizar usuario: $e',
@@ -265,27 +275,58 @@ class SupabaseService {
   /// Elimina un usuario completamente (autenticación y base de datos)
   static Future<Map<String, dynamic>> deleteUser(String userId) async {
     try {
-      await client
+      print('🗑️ Intentando eliminar usuario: $userId');
+      
+      // Primero verificar que el usuario existe
+      final userCheck = await client
+          .from('usuarios')
+          .select('id, name, email')
+          .eq('id', userId)
+          .maybeSingle();
+      
+      if (userCheck == null) {
+        print(' Usuario no encontrado en la base de datos');
+        return {
+          'success': false,
+          'message': 'Usuario no encontrado',
+        };
+      }
+      
+      print(' Usuario encontrado: ${userCheck['name']}');
+      print('🔄 Eliminando de la tabla usuarios...');
+      
+      final deleteResponse = await client
           .from('usuarios')
           .delete()
-          .eq('id', userId);
+          .eq('id', userId)
+          .select();
+      
+      print('📊 Respuesta de eliminación: $deleteResponse');
 
+      // Intentar eliminar del auth (esto puede fallar si no hay permisos de admin)
       try {
+        print('🔄 Intentando eliminar del auth...');
         await client.auth.admin.deleteUser(userId);
+        print('✅ Usuario eliminado del auth');
       } catch (e) {
-        print(' No se pudo eliminar del auth (puede requerir permisos): $e');
+        print('⚠️ No se pudo eliminar del auth (puede requerir permisos): $e');
       }
 
+      print('✅ Usuario eliminado exitosamente de la BD');
       return {
         'success': true,
         'message': 'Usuario eliminado exitosamente',
       };
     } on PostgrestException catch (e) {
+      print('❌ Error PostgrestException: ${e.message}');
+      print('   Código: ${e.code}');
+      print('   Detalles: ${e.details}');
       return {
         'success': false,
         'message': 'Error de base de datos: ${e.message}',
       };
     } catch (e) {
+      print('💥 Error general al eliminar usuario: $e');
       return {
         'success': false,
         'message': 'Error al eliminar usuario: $e',
@@ -458,7 +499,7 @@ class SupabaseService {
   static Future<Map<String, dynamic>> getObjetosDisponibles() async {
     try {
       final response = await client
-          .from('objetos')
+          .from('productos_unificados')
           .select()
           .eq('disponible', true)
           .eq('estado_aprobacion', 'aprobado')
@@ -491,7 +532,7 @@ class SupabaseService {
       }
 
       final response = await client
-          .from('objetos')
+          .from('productos_unificados')
           .select()
           .eq('usuario_id', userId)
           .order('creado_en', ascending: false);
@@ -526,7 +567,7 @@ class SupabaseService {
       final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExt';
       final filePath2 = '$userId/$fileName';
 
-      await client.storage.from('objetos').uploadBinary(
+      await client.storage.from('productos').uploadBinary(
             filePath2,
             bytes,
             fileOptions: FileOptions(
@@ -535,7 +576,7 @@ class SupabaseService {
             ),
           );
 
-      final imageUrl = client.storage.from('objetos').getPublicUrl(filePath2);
+      final imageUrl = client.storage.from('productos').getPublicUrl(filePath2);
 
       return {
         'success': true,
@@ -558,6 +599,7 @@ class SupabaseService {
     required String categoria,
     required String estado,
     String? imagenUrl,
+    int? puntosNecesarios,
   }) async {
     try {
       final userId = client.auth.currentUser?.id;
@@ -568,16 +610,22 @@ class SupabaseService {
         };
       }
 
-      final response = await client.from('objetos').insert({
+      final data = {
         'usuario_id': userId,
         'nombre': nombre,
         'descripcion': descripcion,
         'categoria': categoria,
-        'estado': estado,
-        'imagen_url': imagenUrl,
+        'estado_fisico': estado,
         'disponible': true,
         'estado_aprobacion': 'borrador',
-      }).select().single();
+        'puntos_necesarios': puntosNecesarios ?? 6,
+      };
+
+      if (imagenUrl != null) {
+        data['image_urls'] = [imagenUrl];
+      }
+
+      final response = await client.from('productos_unificados').insert(data).select().single();
 
       return {
         'success': true,
@@ -608,13 +656,17 @@ class SupabaseService {
         'nombre': nombre,
         'descripcion': descripcion,
         'categoria': categoria,
-        'estado': estado,
+        'estado_fisico': estado, // Cambio: estado → estado_fisico
       };
 
-      if (imagenUrl != null) data['imagen_url'] = imagenUrl;
+      // Cambio: imagen_url → image_urls (array)
+      if (imagenUrl != null) {
+        data['image_urls'] = [imagenUrl]; // Convertir a array
+      }
       if (disponible != null) data['disponible'] = disponible;
 
-      await client.from('objetos').update(data).eq('id', objetoId);
+      // Cambio: objetos → productos_unificados
+      await client.from('productos_unificados').update(data).eq('id', objetoId);
 
       return {
         'success': true,
@@ -633,20 +685,24 @@ class SupabaseService {
   static Future<Map<String, dynamic>> deleteObjeto(String objetoId) async {
     try {
       final objeto = await client
-          .from('objetos')
-          .select('imagen_url')
+          .from('productos_unificados')
+          .select('image_urls')
           .eq('id', objetoId)
           .single();
 
-      await client.from('objetos').delete().eq('id', objetoId);
+      await client.from('productos_unificados').delete().eq('id', objetoId);
 
-      if (objeto['imagen_url'] != null && objeto['imagen_url'].toString().isNotEmpty) {
+      if (objeto['image_urls'] != null) {
         try {
-          final imageUrl = objeto['imagen_url'] as String;
-          final filePath = imageUrl.split('/objetos/').last;
-          await client.storage.from('objetos').remove([filePath]);
+          final imageUrls = List<String>.from(objeto['image_urls'] as List);
+          for (final imageUrl in imageUrls) {
+            if (imageUrl.isNotEmpty) {
+              final filePath = imageUrl.split('/productos/').last;
+              await client.storage.from('productos').remove([filePath]);
+            }
+          }
         } catch (e) {
-          print('Error al eliminar imagen del Storage: $e');
+          print('Error al eliminar imágenes del Storage: $e');
         }
       }
 
@@ -667,7 +723,7 @@ class SupabaseService {
   static Future<Map<String, dynamic>> marcarObjetoNoDisponible(String objetoId) async {
     try {
       await client
-          .from('objetos')
+          .from('productos_unificados')
           .update({'disponible': false})
           .eq('id', objetoId);
 
@@ -688,7 +744,7 @@ class SupabaseService {
   static Future<Map<String, dynamic>> enviarARevision(String objetoId) async {
     try {
       await client
-          .from('objetos')
+          .from('productos_unificados')
           .update({'estado_aprobacion': 'pendiente'})
           .eq('id', objetoId);
 
@@ -709,7 +765,7 @@ class SupabaseService {
   static Future<Map<String, dynamic>> getObjetosPendientes() async {
     try {
       final objetosResponse = await client
-          .from('objetos')
+          .from('productos_unificados')
           .select()
           .eq('estado_aprobacion', 'pendiente')
           .order('creado_en', ascending: false);
@@ -765,7 +821,7 @@ class SupabaseService {
         };
       }
 
-      await client.from('objetos').update({
+      await client.from('productos_unificados').update({
         'estado_aprobacion': 'aprobado',
         'aprobado_por': userId,
         'fecha_aprobacion': DateTime.now().toIso8601String(),
@@ -796,7 +852,7 @@ class SupabaseService {
         };
       }
 
-      await client.from('objetos').update({
+      await client.from('productos_unificados').update({
         'estado_aprobacion': 'rechazado',
         'aprobado_por': userId,
         'fecha_aprobacion': DateTime.now().toIso8601String(),
@@ -831,9 +887,9 @@ class SupabaseService {
       final List<Map<String, dynamic>> processedUsers = response.map((userData) {
         return {
           'id': userData['id'],
-          'name': userData['name'], // CAMBIO: Clave corregida
-          'email': userData['email'], // CAMBIO: Clave corregida
-          'rol': userData['role'] ?? 'usuario',
+          'name': userData['name'],
+          'email': userData['email'],
+          'role': userData['role'] ?? 'usuario', // CORRECCIÓN: Usar 'role' en lugar de 'rol'
           'created_at': userData['created_at'],
           'updated_at': userData['updated_at'],
         };
@@ -865,9 +921,9 @@ class SupabaseService {
       final List<Map<String, dynamic>> processedUsers = usersData.map((userData) {
         return {
           'id': userData['id'],
-          'name': userData['name'], // CAMBIO: Clave corregida
-          'email': userData['email'], // CAMBIO: Clave corregida
-          'rol': userData['role'],
+          'name': userData['name'],
+          'email': userData['email'],
+          'role': userData['role'], // CORRECCIÓN: Usar 'role' en lugar de 'rol'
           'created_at': userData['created_at'],
           'updated_at': userData['updated_at'],
         };

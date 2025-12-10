@@ -8,6 +8,7 @@ import 'package:trueque/theme/app_theme.dart';
 import 'package:trueque/screens/login_screen.dart';
 import 'package:trueque/screens/new_password_screen.dart'; 
 //import 'package:trueque/screens/home_screen.dart';
+import 'package:trueque/screens/add_product_screen.dart';
 
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -66,12 +67,12 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       
       routes: {
-        '/': (context) => const LoginScreen(), 
+        '/': (context) => const  LoginScreen(), 
         '/login': (context) => const LoginScreen(),
         '/registro': (context) => const RegisterScreen(),
        // '/home': (context) => const HomeScreen(),
         '/reset-password': (context) => const NewPasswordScreen(),
-        '/password': (context) => const PasswordScreen(),
+        '/password': (context) => const NewPasswordScreen(),
         '/profile': (context) => const ProfileScreen(),
       }
     );

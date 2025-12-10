@@ -1,9 +1,13 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
 import 'package:trueque/modelo/user.model.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
+import '../services/productos_unificados_service.dart';
+import '../modelo/producto_unificado_model.dart';
 
 class ObjectsScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -35,16 +39,20 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     
-    final disponibles = await SupabaseService.getObjetosDisponibles();
-    final misObjetos = await SupabaseService.getMisObjetos();
+    final disponibles = await ProductosUnificadosService.getProductosDisponibles();
+    final misObjetos = await ProductosUnificadosService.getMisProductos();
     
     if (mounted) {
       setState(() {
         if (disponibles['success']) {
-          _objetosDisponibles = List<Map<String, dynamic>>.from(disponibles['data']);
+          _objetosDisponibles = List<Map<String, dynamic>>.from(
+            (disponibles['data'] as List).map((p) => (p as ProductoUnificado).toJson())
+          );
         }
         if (misObjetos['success']) {
-          _misObjetos = List<Map<String, dynamic>>.from(misObjetos['data']);
+          _misObjetos = List<Map<String, dynamic>>.from(
+            (misObjetos['data'] as List).map((p) => (p as ProductoUnificado).toJson())
+          );
         }
         _isLoading = false;
       });
@@ -76,8 +84,10 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
   IconData _getCategoriaIcon(String categoria) {
     switch (categoria) {
       case 'Electrónicos': return Icons.phone_android;
+      case 'Comida': return Icons.restaurant;
       case 'Ropa': return Icons.checkroom;
       case 'Libros': return Icons.menu_book;
+      case 'Útiles Escolares': return Icons.school;
       case 'Deportes': return Icons.sports_soccer;
       case 'Hogar': return Icons.home;
       case 'Otros': return Icons.toys;
@@ -89,11 +99,12 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('lib/assets/fondo.jpg'),
-            fit: BoxFit.cover,
-          ),
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          // image: DecorationImage(
+          //   image: AssetImage('assets/fondo.jpg'),
+          //   fit: BoxFit.cover,
+          // ),
         ),
         child: Container(
           decoration: BoxDecoration(
@@ -351,32 +362,49 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Imagen
-          if (objeto['imagen_url'] != null)
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: Image.network(
-                objeto['imagen_url'],
-                height: 200,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
+          Builder(
+            builder: (context) {
+              final imageUrls = objeto['image_urls'];
+              final hasImage = imageUrls != null && 
+                               imageUrls is List && 
+                               imageUrls.isNotEmpty;
+              
+              if (hasImage) {
+                return Container(
                   height: 200,
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.image_not_supported, size: 64, color: Colors.grey),
-                ),
-              ),
-            )
-          else
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: const Center(
-                child: Icon(Icons.image, size: 64, color: Colors.grey),
-              ),
-            ),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: Image.network(
+                      imageUrls.first,
+                      height: 200,
+                      width: double.infinity,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        height: 200,
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.image_not_supported, size: 64, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                );
+              } else {
+                return Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.image, size: 64, color: Colors.grey),
+                  ),
+                );
+              }
+            },
+          ),
 
           Padding(
             padding: const EdgeInsets.all(16),
@@ -398,15 +426,15 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _getEstadoColor(objeto['estado']).withValues(alpha: 0.2),
+                        color: _getEstadoColor(objeto['estado_fisico'] ?? 'buen_estado').withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        _getEstadoLabel(objeto['estado']),
+                        _getEstadoLabel(objeto['estado_fisico'] ?? 'buen_estado'),
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: _getEstadoColor(objeto['estado']),
+                          color: _getEstadoColor(objeto['estado_fisico'] ?? 'buen_estado'),
                         ),
                       ),
                     ),
@@ -672,45 +700,23 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
         ),
       );
     } else if (estadoAprobacion == 'aprobado') {
-      // Aprobado: Solo Marcar Intercambiado y Eliminar (sin Editar)
-      return Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: disponible ? () => _marcarNoDisponible(objeto) : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: const Icon(Icons.check_circle, color: Colors.white, size: 18),
-              label: Text(
-                'Marcar como Intercambiado',
-                style: GoogleFonts.poppins(color: Colors.white),
-              ),
+      // Aprobado: Solo Marcar Intercambiado (sin Editar ni Eliminar)
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: disponible ? () => _marcarNoDisponible(objeto) : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _confirmDelete(objeto),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFEF233C)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: const Icon(Icons.delete, color: Color(0xFFEF233C), size: 18),
-              label: Text(
-                'Eliminar',
-                style: GoogleFonts.poppins(color: const Color(0xFFEF233C)),
-              ),
-            ),
+          icon: const Icon(Icons.check_circle, color: Colors.white, size: 18),
+          label: Text(
+            disponible ? 'Marcar como Intercambiado' : 'Ya Intercambiado',
+            style: GoogleFonts.poppins(color: Colors.white),
           ),
-        ],
+        ),
       );
     } else if (estadoAprobacion == 'rechazado') {
       // Rechazado: Editar y Reenviar, Eliminar
@@ -763,7 +769,7 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
     final descripcionController = TextEditingController();
     String categoria = 'Electrónicos';
     String estado = 'buen_estado';
-    File? selectedImage;
+    XFile? selectedImage;
     final formKey = GlobalKey<FormState>();
     bool isUploading = false;
 
@@ -815,7 +821,7 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
                       
                       if (image != null) {
                         setDialogState(() {
-                          selectedImage = File(image.path);
+                          selectedImage = image;
                         });
                       }
                     },
@@ -830,9 +836,14 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
                       child: selectedImage != null
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(12),
-                              child: Image.file(
-                                selectedImage!,
-                                fit: BoxFit.cover,
+                              child: FutureBuilder<Uint8List>(
+                                future: selectedImage!.readAsBytes(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasData) {
+                                    return Image.memory(snapshot.data!, fit: BoxFit.cover);
+                                  }
+                                  return const Center(child: CircularProgressIndicator());
+                                },
                               ),
                             )
                           : Column(
@@ -904,8 +915,9 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
                     ),
                     items: const [
                       DropdownMenuItem(value: 'Electrónicos', child: Text('Electrónicos')),
+                      DropdownMenuItem(value: 'Comida', child: Text('Comida')),
                       DropdownMenuItem(value: 'Ropa', child: Text('Ropa')),
-                      DropdownMenuItem(value: 'Libros', child: Text('Libros')),
+                      DropdownMenuItem(value: 'Útiles Escolares', child: Text('Útiles Escolares')),
                       DropdownMenuItem(value: 'Deportes', child: Text('Deportes')),
                       DropdownMenuItem(value: 'Hogar', child: Text('Hogar')),
                       DropdownMenuItem(value: 'Otros', child: Text('Otros')),
@@ -964,18 +976,28 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
 
                         // Subir imagen si existe
                         if (selectedImage != null) {
-                          final uploadResult = await SupabaseService.uploadImagenObjeto(
-                            selectedImage!.path,
-                          );
+                          try {
+                            final imageBytes = await selectedImage!.readAsBytes();
+                            final imageExtension = selectedImage!.name.split('.').last.toLowerCase();
+                            final userId = SupabaseService.client.auth.currentUser?.id;
+                            final imageFileName = '$userId/${DateTime.now().millisecondsSinceEpoch}.$imageExtension';
 
-                          if (!uploadResult['success']) {
+                            await SupabaseService.client.storage
+                                .from('productos_unificados')
+                                .uploadBinary(
+                                  imageFileName,
+                                  imageBytes,
+                                  fileOptions: FileOptions(cacheControl: '3600', upsert: false),
+                                );
+
+                            imageUrl = SupabaseService.client.storage
+                                .from('productos_unificados')
+                                .getPublicUrl(imageFileName);
+                          } catch (e) {
                             if (dialogContext.mounted) {
                               ScaffoldMessenger.of(this.context).showSnackBar(
                                 SnackBar(
-                                  content: Text(
-                                    '❌ ${uploadResult['message']}',
-                                    style: GoogleFonts.poppins(),
-                                  ),
+                                  content: Text('❌ Error al subir imagen: $e', style: GoogleFonts.poppins()),
                                   backgroundColor: const Color(0xFFEF233C),
                                 ),
                               );
@@ -983,17 +1005,38 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
                             setDialogState(() => isUploading = false);
                             return;
                           }
-
-                          imageUrl = uploadResult['imageUrl'];
                         }
 
-                        // Crear objeto
-                        final result = await SupabaseService.createObjeto(
+                        // Mapear estado a puntos
+                        int puntos;
+                        switch (estado) {
+                          case 'para_reparar':
+                            puntos = 2;
+                            break;
+                          case 'usado':
+                            puntos = 4;
+                            break;
+                          case 'buen_estado':
+                            puntos = 6;
+                            break;
+                          case 'como_nuevo':
+                            puntos = 8;
+                            break;
+                          case 'nuevo':
+                            puntos = 10;
+                            break;
+                          default:
+                            puntos = 6;
+                        }
+
+                        // Crear producto
+                        final result = await ProductosUnificadosService.createProducto(
                           nombre: nombreController.text.trim(),
                           descripcion: descripcionController.text.trim(),
                           categoria: categoria,
-                          estado: estado,
-                          imagenUrl: imageUrl,
+                          estadoFisico: estado,
+                          puntosNecesarios: puntos,
+                          imageUrls: imageUrl != null ? [imageUrl] : [],
                         );
 
                         if (dialogContext.mounted) Navigator.pop(dialogContext);
@@ -1041,9 +1084,11 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
     final nombreController = TextEditingController(text: objeto['nombre']);
     final descripcionController = TextEditingController(text: objeto['descripcion']);
     String categoria = objeto['categoria'] ?? 'Electrónicos';
-    String estado = objeto['estado'];
-    File? selectedImage;
-    String? currentImageUrl = objeto['imagen_url'];
+    String estado = objeto['estado_fisico'] ?? 'buen_estado'; // Corregido: estado_fisico
+    XFile? selectedImage;
+    String? currentImageUrl = objeto['image_urls'] != null && (objeto['image_urls'] as List).isNotEmpty
+        ? (objeto['image_urls'] as List).first
+        : null; // Corregido: image_urls
     final formKey = GlobalKey<FormState>();
     bool isUploading = false;
 
@@ -1087,7 +1132,7 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
                       );
                       if (image != null) {
                         setDialogState(() {
-                          selectedImage = File(image.path);
+                          selectedImage = image;
                           currentImageUrl = null;
                         });
                       }
@@ -1101,7 +1146,18 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
                         border: Border.all(color: Colors.grey[400]!),
                       ),
                       child: selectedImage != null
-                          ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(selectedImage!, fit: BoxFit.cover))
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: FutureBuilder<Uint8List>(
+                                future: selectedImage!.readAsBytes(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasData) {
+                                    return Image.memory(snapshot.data!, fit: BoxFit.cover);
+                                  }
+                                  return const Center(child: CircularProgressIndicator());
+                                },
+                              ),
+                            )
                           : currentImageUrl != null
                               ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.network(currentImageUrl!, fit: BoxFit.cover))
                               : Column(
@@ -1141,8 +1197,9 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
                     decoration: InputDecoration(filled: true, fillColor: Colors.grey[100], border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
                     items: const [
                       DropdownMenuItem(value: 'Electrónicos', child: Text('Electrónicos')),
+                      DropdownMenuItem(value: 'Comida', child: Text('Comida')),
                       DropdownMenuItem(value: 'Ropa', child: Text('Ropa')),
-                      DropdownMenuItem(value: 'Libros', child: Text('Libros')),
+                      DropdownMenuItem(value: 'Útiles Escolares', child: Text('Útiles Escolares')),
                       DropdownMenuItem(value: 'Deportes', child: Text('Deportes')),
                       DropdownMenuItem(value: 'Hogar', child: Text('Hogar')),
                       DropdownMenuItem(value: 'Otros', child: Text('Otros')),
@@ -1180,18 +1237,44 @@ class _ObjectsScreenState extends State<ObjectsScreen> with SingleTickerProvider
                   setDialogState(() => isUploading = true);
                   String? imageUrl = currentImageUrl;
                   if (selectedImage != null) {
-                    final uploadResult = await SupabaseService.uploadImagenObjeto(selectedImage!.path);
-                    if (!uploadResult['success']) {
-                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ ${uploadResult['message']}', style: GoogleFonts.poppins()), backgroundColor: const Color(0xFFEF233C)));
+                    try {
+                      final imageBytes = await selectedImage!.readAsBytes();
+                      final imageExtension = selectedImage!.name.split('.').last.toLowerCase();
+                      final userId = SupabaseService.client.auth.currentUser?.id;
+                      final imageFileName = '$userId/${DateTime.now().millisecondsSinceEpoch}.$imageExtension';
+
+                      await SupabaseService.client.storage
+                          .from('productos_unificados')
+                          .uploadBinary(
+                            imageFileName,
+                            imageBytes,
+                            fileOptions: FileOptions(cacheControl: '3600', upsert: false),
+                          );
+
+                      imageUrl = SupabaseService.client.storage
+                          .from('productos_unificados')
+                          .getPublicUrl(imageFileName);
+                    } catch (e) {
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Error al subir imagen: $e', style: GoogleFonts.poppins()), backgroundColor: const Color(0xFFEF233C)));
                       setDialogState(() => isUploading = false);
                       return;
                     }
-                    imageUrl = uploadResult['imageUrl'];
                   }
                   final result = await SupabaseService.updateObjeto(objetoId: objeto['id'], nombre: nombreController.text.trim(), descripcion: descripcionController.text.trim(), categoria: categoria, estado: estado, imagenUrl: imageUrl);
+                  
+                  // Si el objeto estaba rechazado, enviarlo automáticamente a revisión
+                  if (result['success'] && objeto['estado_aprobacion'] == 'rechazado') {
+                    await SupabaseService.enviarARevision(objeto['id']);
+                  }
+                  
                   if (mounted) Navigator.pop(context);
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['success'] ? '✅ Objeto actualizado' : '❌ ${result['message']}', style: GoogleFonts.poppins()), backgroundColor: result['success'] ? Colors.green : const Color(0xFFEF233C)));
+                    String mensaje = result['success'] 
+                        ? (objeto['estado_aprobacion'] == 'rechazado' 
+                            ? '✅ Objeto actualizado y reenviado a revisión' 
+                            : '✅ Objeto actualizado')
+                        : '❌ ${result['message']}';
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensaje, style: GoogleFonts.poppins()), backgroundColor: result['success'] ? Colors.green : const Color(0xFFEF233C)));
                     if (result['success']) _loadData();
                   }
                 }
