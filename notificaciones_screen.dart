@@ -173,6 +173,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
                 elevation: 2,
                 color: isRead ? Colors.white : const Color(0xFFFFF5F5),
                 child: ListTile(
+                  isThreeLine: true, // Permite más espacio vertical
                   leading: CircleAvatar(
                     backgroundColor: isRead ? Colors.grey.shade200 : const Color(0xFFFDE4E4),
                     child: Icon(
@@ -186,12 +187,11 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
                     notification['title'] ?? 'Sin Título',
                     style: TextStyle(fontWeight: isRead ? FontWeight.normal : FontWeight.bold),
                   ),
-                  subtitle: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(notification['body'] ?? '', overflow: TextOverflow.ellipsis),
-                      ),
+                      Text(notification['body'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
                       Text(
                         timeago.format(createdAt, locale: 'es'),
                         style: const TextStyle(color: Colors.grey, fontSize: 12),
